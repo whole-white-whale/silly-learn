@@ -8,6 +8,7 @@ pub trait TrainedSupervisedModel<X, Y> {
 
 pub trait SupervisedModel<X, Y> {
     type Trained: TrainedSupervisedModel<X, Y>;
+    type Error: std::error::Error;
 
-    fn train(&self, x: &ArrayRef2<X>, y: &ArrayRef1<f64>) -> Self::Trained;
+    fn train(&self, x: &ArrayRef2<X>, y: &ArrayRef1<f64>) -> Result<Self::Trained, Self::Error>;
 }

@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 ndarray = "0.17.2"
 ndarray-linalg = "0.18.1"
+thiserror = "2.0.18"
 
 [dev-dependencies]
 ndarray-linalg = { version = "0.18.1", features = ["openblas"] }
