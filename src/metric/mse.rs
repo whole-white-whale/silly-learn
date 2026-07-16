@@ -3,7 +3,7 @@ use ndarray::ArrayRef1;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum MaeError {
+pub enum MseError {
     #[error(
         "sample counts do not match: y_true_sample_count = {y_true_sample_count}, y_pred_sample_count = {y_pred_sample_count}"
     )]
@@ -13,18 +13,18 @@ pub enum MaeError {
     },
 }
 
-pub fn mae(y_true: &ArrayRef1<f64>, y_pred: &ArrayRef1<f64>) -> Result<f64, MaeError> {
+pub fn mse(y_true: &ArrayRef1<f64>, y_pred: &ArrayRef1<f64>) -> Result<f64, MseError> {
     let y_true_sample_count = y_true.len();
     let y_pred_sample_count = y_pred.len();
 
     if y_true_sample_count != y_pred_sample_count {
-        return Err(MaeError::SampleCountsDoNotMatch {
+        return Err(MseError::SampleCountsDoNotMatch {
             y_true_sample_count,
             y_pred_sample_count,
         });
     }
 
-    Ok(1.0 / (y_true_sample_count as f64) * (y_true - y_pred).abs().sum())
+    Ok(1.0 / (y_true_sample_count as f64) * (y_true - y_pred).pow2().sum())
 }
 
 #[cfg(test)]
@@ -43,34 +43,34 @@ mod test {
         let y_true = array![0.0, 0.0, 0.0, 0.0];
         let y_pred = array![0.0, 0.0, 0.0];
 
-        let mae_result = mae(&y_true, &y_pred);
+        let mae_result = mse(&y_true, &y_pred);
 
-        assert_matches!(mae_result, Err(MaeError::SampleCountsDoNotMatch { .. }));
+        assert_matches!(mae_result, Err(MseError::SampleCountsDoNotMatch { .. }));
 
         let y_pred = array![0.0, 0.0, 0.0, 0.0, 0.0];
 
-        let mae_result = mae(&y_true, &y_pred);
+        let mae_result = mse(&y_true, &y_pred);
 
-        assert_matches!(mae_result, Err(MaeError::SampleCountsDoNotMatch { .. }));
+        assert_matches!(mae_result, Err(MseError::SampleCountsDoNotMatch { .. }));
     }
 
     #[test]
-    fn mae_is_zero() {
+    fn mse_is_zero() {
         let y_true = array![0.0, 1.0];
         let y_pred = array![0.0, 1.0];
 
-        let score = mae(&y_true, &y_pred).unwrap();
+        let score = mse(&y_true, &y_pred).unwrap();
 
         assert_aclose!(score, 0.0, EPSILON);
     }
 
     #[test]
-    fn mae_is_not_zero() {
+    fn mse_is_not_zero() {
         let y_true = array![1.0, 0.0];
         let y_pred = array![0.0, 2.0];
 
-        let score = mae(&y_true, &y_pred).unwrap();
+        let score = mse(&y_true, &y_pred).unwrap();
 
-        assert_aclose!(score, 1.5, EPSILON);
+        assert_aclose!(score, 2.5, EPSILON);
     }
 }
