@@ -1,4 +1,4 @@
-use ndarray::{Array1, ArrayRef1, ArrayRef2};
+use ndarray::{Array1, Array2, ArrayRef1, ArrayRef2};
 
 use ndarray_linalg::Inverse;
 use ndarray_linalg::error::LinalgError;
@@ -18,11 +18,28 @@ impl TrainedSupervisedModel<f64, f64> for TrainedLinearRegression {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct LinearRegression {}
+#[derive(Debug)]
+pub struct LinearRegression {
+    lambda: f64,
+}
+
+impl LinearRegression {
+    pub fn ridge(lambda: f64) -> Self {
+        Self { lambda }
+    }
+}
+
+impl Default for LinearRegression {
+    fn default() -> Self {
+        Self { lambda: 0.0 }
+    }
+}
 
 #[derive(Debug, Error)]
 pub enum LinearRegressionError {
+    #[error("lambda is negative: lambda = {lambda}")]
+    LambdaIsNegative { lambda: f64 },
+
     #[error(
         "sample counts do not match: x_sample_count = {x_sample_count}, y_sample_count = {y_sample_count}"
     )]
@@ -43,6 +60,12 @@ impl SupervisedModel<f64, f64> for LinearRegression {
     type Error = LinearRegressionError;
 
     fn train(&self, x: &ArrayRef2<f64>, y: &ArrayRef1<f64>) -> Result<Self::Trained, Self::Error> {
+        if self.lambda < 0.0 {
+            return Err(LinearRegressionError::LambdaIsNegative {
+                lambda: self.lambda,
+            });
+        }
+
         let x_sample_count = x.nrows();
         let y_sample_count = y.len();
 
@@ -58,7 +81,9 @@ impl SupervisedModel<f64, f64> for LinearRegression {
         }
 
         Ok(TrainedLinearRegression {
-            beta: x.t().dot(x).inv()?.dot(&x.t().dot(y)),
+            beta: (x.t().dot(x) + self.lambda * Array2::eye(x.ncols()))
+                .inv()?
+                .dot(&x.t().dot(y)),
         })
     }
 }
@@ -73,6 +98,24 @@ mod test {
     use super::*;
 
     const EPSILON: f64 = 1.0e-8;
+
+    #[test]
+    fn lambda_is_negative() {
+        let x_train = array![
+            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
+            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
+        ];
+
+        let y_train = array![0.0];
+
+        let model = LinearRegression::ridge(-1.0);
+        let train_result = model.train(&x_train, &y_train);
+
+        assert_matches!(
+            train_result,
+            Err(LinearRegressionError::LambdaIsNegative { .. })
+        );
+    }
 
     #[test]
     fn sample_counts_do_not_match() {
