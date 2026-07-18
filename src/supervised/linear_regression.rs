@@ -1,4 +1,4 @@
-use ndarray::{Array1, Array2, ArrayRef1, ArrayRef2};
+use ndarray::{Array1, Array2, ArrayRef1, ArrayRef2, Axis, concatenate};
 
 use ndarray_linalg::Inverse;
 use ndarray_linalg::error::LinalgError;
@@ -14,6 +14,12 @@ pub struct TrainedLinearRegression {
 
 impl TrainedSupervisedModel<f64, f64> for TrainedLinearRegression {
     fn y(&self, x: &ArrayRef2<f64>) -> Array1<f64> {
+        let x = concatenate(
+            Axis(1),
+            &[Array2::from_elem((x.nrows(), 1), 1.0).view(), x.view()],
+        )
+        .unwrap();
+
         x.dot(&self.beta)
     }
 }
@@ -80,8 +86,14 @@ impl SupervisedModel<f64, f64> for LinearRegression {
             return Err(LinearRegressionError::SampleCountIsZero);
         }
 
+        let x = concatenate(
+            Axis(1),
+            &[Array2::from_elem((x_sample_count, 1), 1.0).view(), x.view()],
+        )
+        .unwrap();
+
         Ok(TrainedLinearRegression {
-            beta: (x.t().dot(x) + self.lambda * Array2::eye(x.ncols()))
+            beta: (x.t().dot(&x) + self.lambda * Array2::eye(x.ncols()))
                 .inv()?
                 .dot(&x.t().dot(y)),
         })
@@ -102,11 +114,13 @@ mod test {
     #[test]
     fn lambda_is_negative() {
         let x_train = array![
-            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
-            [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
         ];
 
-        let y_train = array![0.0];
+        let y_train = array![0.0, 0.0, 0.0, 0.0];
 
         let model = LinearRegression::ridge(-1.0);
         let train_result = model.train(&x_train, &y_train);
@@ -189,7 +203,7 @@ mod test {
         let y_train = array![1.0, 5.0];
         let y_valid = array![9.0];
 
-        let model = LinearRegression::default();
+        let model = LinearRegression::ridge(0.1 * EPSILON);
         let trained_model = model.train(&x_train, &y_train).unwrap();
 
         assert_close_l2!(&trained_model.y(&x_valid), &y_valid, EPSILON);
